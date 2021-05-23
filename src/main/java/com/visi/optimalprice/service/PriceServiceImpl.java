@@ -5,7 +5,7 @@ import com.visi.optimalprice.model.Order;
 import com.visi.optimalprice.model.Product;
 import com.visi.optimalprice.model.ProductPrice;
 import com.visi.optimalprice.repository.OrderRepository;
-import com.visi.optimalprice.repository.PriceRepository;
+import com.visi.optimalprice.repository.ProductRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -15,14 +15,23 @@ import java.util.*;
 public class PriceServiceImpl implements PriceService{
 
     @Autowired
-    private PriceRepository priceRepository;
+    private ProductService productService;
 
     @Autowired
     private OrderRepository orderRepository;
 
+    @Autowired
+    private ProductRepository productRepository;
+
+    @Autowired
+    private ActualPriceCalculator priceCalculator;
+
+    @Autowired
+    private OptimalPriceCalculator optimalPriceCalculator;
+
     @Override
     public Map<Integer, Double> getInitialPriceData(long productId) {
-        Product product =getProductById(productId);
+        Product product =productService.getProductById(productId);
         return calculateInitalPrice(product);
     }
 
@@ -30,16 +39,14 @@ public class PriceServiceImpl implements PriceService{
     public Order calculateOptimalPrice(Order order) {
         double totalOptimalPrice =0;
         double totalActualPrice =0;
+
         for (CartItem item: order.getCartItemList()) {
-            String productId = item.getProduct_id();
-            Product product = getProductById(Long.parseLong(productId));
-            double singleUnitPrice = product.getCartonPrice()/product.getUnitsPerCarton();
-            double actualPrice = calculateActualPrice(item.getQuantity(), singleUnitPrice);
+            double actualPrice = priceCalculator.calculatePrice(item);
             item.setActual_price(actualPrice);
-            double optimalPrice = calculateOptimalPrice(item);
+            double optimalPrice = optimalPriceCalculator.calculatePrice(item);
             item.setOptimal_price(optimalPrice);
-            totalOptimalPrice = totalOptimalPrice+ optimalPrice;
-            totalActualPrice = totalActualPrice+ actualPrice;
+            totalOptimalPrice += optimalPrice;
+            totalActualPrice += actualPrice;
         }
         order.setTotalOptimalPrice(totalOptimalPrice);
         order.setTotalActualPrice(totalActualPrice);
@@ -48,7 +55,7 @@ public class PriceServiceImpl implements PriceService{
 
     @Override
     public List<ProductPrice> getAllProductPriceList() {
-        List<Product> products = priceRepository.findAll();
+        List<Product> products = productRepository.findAll();
         ArrayList<ProductPrice> allProductPrices = new ArrayList<>();
         if(!products.isEmpty()){
             for (Product product: products) {
@@ -66,17 +73,6 @@ public class PriceServiceImpl implements PriceService{
         return null;
     }
 
-    public Product getProductById(long productId){
-        Optional<Product> optional = priceRepository.findById(productId);
-        Product product = null;
-        if(optional.isPresent()){
-            product = optional.get();
-        } else {
-            throw new RuntimeException("Product is not available with id : "+ productId);
-        }
-        return product;
-    }
-
     public Map<Integer, Double> calculateInitalPrice(Product product){
         Map<Integer,Double> priceMap = new HashMap<Integer,Double>();
         int unitsPerCarton =product.getUnitsPerCarton();
@@ -84,9 +80,6 @@ public class PriceServiceImpl implements PriceService{
         int minUnit =1;
         int maxUnit =50;
         double price=0;
-        int carton =0;
-        int remainingUnits =0;
-
         for(int i=minUnit; i<=maxUnit; i++){
             price = i*singleUnitPrice;
             priceMap.put(i,price);
@@ -94,40 +87,4 @@ public class PriceServiceImpl implements PriceService{
         return priceMap;
     }
 
-    public double calculateActualPrice(int purchasedUnit, double singleUnitPrice){
-        return purchasedUnit*singleUnitPrice;
-    }
-
-    public double calculateOptimalPrice(CartItem item){
-        String productId = item.getProduct_id();
-        Product product = getProductById(Long.parseLong(productId));
-        double singleUnitPrice = product.getCartonPrice()/product.getUnitsPerCarton();
-        double actualPrice = calculateActualPrice(item.getQuantity(), singleUnitPrice);
-
-        int numOfCartons = item.getQuantity()/product.getUnitsPerCarton();
-        int remainingUnits = item.getQuantity() % product.getUnitsPerCarton();
-
-        double optimalPrice =0;
-
-        if(numOfCartons >0 ){
-            optimalPrice =optimalPrice + (numOfCartons*product.getCartonPrice());
-            if(numOfCartons>=3){
-                double discount = addDiscount(numOfCartons,product.getCartonPrice());
-                optimalPrice = optimalPrice - discount;
-            }
-
-            if(remainingUnits > 0){
-                //optimalPrice = optimalPrice + (remainingUnits* singleUnitPrice);
-                //add compensation
-                double compensation = product.getCartonPrice() * 1.3;
-                optimalPrice = optimalPrice +compensation;
-            }
-        }
-        return optimalPrice;
-    }
-
-    public double addDiscount(int numOfCartons, double cartonPrice){
-        double discount = numOfCartons *(0.1*cartonPrice);
-        return discount;
-    }
 }

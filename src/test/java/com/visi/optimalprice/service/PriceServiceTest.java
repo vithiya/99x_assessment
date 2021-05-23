@@ -3,9 +3,8 @@ package com.visi.optimalprice.service;
 import com.visi.optimalprice.model.CartItem;
 import com.visi.optimalprice.model.Order;
 import com.visi.optimalprice.model.Product;
-import com.visi.optimalprice.model.ProductPrice;
 import com.visi.optimalprice.repository.OrderRepository;
-import com.visi.optimalprice.repository.PriceRepository;
+import com.visi.optimalprice.repository.ProductRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mockito;
@@ -15,8 +14,6 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.context.junit4.SpringRunner;
 
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
@@ -30,7 +27,7 @@ public class PriceServiceTest {
     private PriceService priceService;
 
     @MockBean
-    private PriceRepository priceRepository;
+    private ProductRepository priceRepository;
 
     @MockBean
     private OrderRepository orderRepository;
